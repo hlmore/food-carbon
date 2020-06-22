@@ -4,6 +4,9 @@
 #
 # Started by Heather More on 2020-06-17
 #
+# Inspired by a Makeover Monday challenge, which was based on this article:
+#    https://ourworldindata.org/food-choice-vs-eating-local
+#
 # Data from:
 #    Reducing food's environmental impacts through producers and consumers
 #    Table S2
@@ -103,17 +106,59 @@ print(plot_mass_ghg)
 
 #' <!-- ==================================================================== -->
 #' 
-#' ## Plot greenhouse gas emissions at each stage of production
+#' ## Plot kg greenhouse gas emissions at each stage of production
 
-df_ghg_long <- df %>% 
-  select((starts_with("ghg") & !ends_with("total"))
-         | "Product") %>% 
-  pivot_longer(-Product, names_to = "stage", values_to = "stage_ghg_emissions")
+df_ghg <- df %>% 
+  select(starts_with("ghg") | "Product" | "type")
+df_ghg_long <- df_ghg %>% 
+  select(-ends_with("total")) %>% 
+  pivot_longer(cols = starts_with("ghg"), 
+               names_to = "stage", 
+               values_to = "stage_ghg_emissions") %>% 
+  mutate(stage = factor(stage, levels=unique(stage)))  # convert stages to factors so they will be plotted in the correct order; https://www.r-graph-gallery.com/267-reorder-a-variable-in-ggplot2
 
 # Parallel coordinates plot
 # https://datascience.blog.wzb.eu/2016/09/27/parallel-coordinate-plots-for-discrete-and-categorical-data-in-r-a-comparison/
 stages_plot <- ggplot(data = df_ghg_long) +
-  aes(x = stage, y = stage_ghg_emissions, group = Product) +   # group = Product is important!
-  geom_path(aes(color = Product))
+  aes(x = stage, y = stage_ghg_emissions, group = Product, color = type) +   # group = Product is important!
+  geom_path() +
+  theme_light() +
+  scale_color_manual(values = colours_type) +
+  labs(x = "Production stage",
+       y = paste("GHG emissions per kg food (", GetUnits("ghg"), ")")) #+
+  #scale_x_discrete(labels=unique("stage"))
 x11()
 print(stages_plot)
+
+#' <!-- ==================================================================== -->
+#' 
+#' ## Plot % greenhouse gas emissions for each product produced at each stage
+
+df_ghg_percents <- df_ghg %>% 
+  mutate_at(vars(contains("ghg") & !contains("total")), funs(./ ghg_total))
+df_ghg_percents_long <- df_ghg_percents %>% 
+  pivot_longer(cols = (starts_with("ghg") & !ends_with("total")), 
+               names_to = "stage", 
+               values_to = "stage_ghg_emissions") %>% 
+  mutate(stage = factor(stage, levels=unique(stage)))  # convert stages to factors so they will be plotted in the correct order; https://www.r-graph-gallery.com/267-reorder-a-variable-in-ggplot2
+
+# Parallel coordinates plot
+# https://datascience.blog.wzb.eu/2016/09/27/parallel-coordinate-plots-for-discrete-and-categorical-data-in-r-a-comparison/
+stages_percents_plot <- ggplot(data = df_ghg_percents_long) +
+  aes(x = stage, 
+      y = stage_ghg_emissions, 
+      group = Product, 
+      color = type) +   # group = Product is important!
+  geom_path() +
+  theme_light() +
+  scale_color_manual(values = colours_type) +
+  coord_cartesian(ylim = c(-0.3, 1), 
+                  expand = FALSE) +
+  scale_y_continuous(breaks = seq(-0.3, 1, 0.1), 
+                     minor_breaks = NULL, 
+                     labels = round(seq(-0.3, 1, 0.1)*100)) +
+  labs(x = "Production stage",
+       y = paste("% lifespan GHG emissions per kg food (", GetUnits("ghg"), ")")) #+
+#scale_x_discrete(labels=unique("stage"))
+x11()
+print(stages_percents_plot)
