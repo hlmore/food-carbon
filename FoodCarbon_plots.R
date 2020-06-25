@@ -166,8 +166,6 @@ print(stages_percents_plot)
 # Small multiples plots
 # Plot each type of food in its colour, with grey lines behind for the other types.
 # https://drsimonj.svbtle.com/plotting-background-data-for-groups-with-ggplot2
-small_multiples <- stages_percents_plot + 
-  facet_grid(type ~ .)
 background_df <- df_ghg_percents_long %>% 
   select(-type)
 small_multiples <- ggplot(data = df_ghg_percents_long) +
@@ -176,7 +174,7 @@ small_multiples <- ggplot(data = df_ghg_percents_long) +
       group = Product, 
       color = type) +   # group = Product is important!
   geom_path(data = background_df, color = "grey") +
-  geom_path() +
+  geom_path(size = 1) +
   facet_grid(type ~ .) +
   theme_light() +
   scale_color_manual(values = colours_type) +
