@@ -158,7 +158,34 @@ stages_percents_plot <- ggplot(data = df_ghg_percents_long) +
                      minor_breaks = NULL, 
                      labels = round(seq(-0.3, 1, 0.1)*100)) +
   labs(x = "Production stage",
-       y = paste("% lifespan GHG emissions per kg food (", GetUnits("ghg"), ")")) #+
+       y = paste("% lifespan GHG emissions (%)")) #+
 #scale_x_discrete(labels=unique("stage"))
 x11()
 print(stages_percents_plot)
+
+# Small multiples plots
+# Plot each type of food in its colour, with grey lines behind for the other types.
+# https://drsimonj.svbtle.com/plotting-background-data-for-groups-with-ggplot2
+small_multiples <- stages_percents_plot + 
+  facet_grid(type ~ .)
+background_df <- df_ghg_percents_long %>% 
+  select(-type)
+small_multiples <- ggplot(data = df_ghg_percents_long) +
+  aes(x = stage, 
+      y = stage_ghg_emissions,
+      group = Product, 
+      color = type) +   # group = Product is important!
+  geom_path(data = background_df, color = "grey") +
+  geom_path() +
+  facet_grid(type ~ .) +
+  theme_light() +
+  scale_color_manual(values = colours_type) +
+  coord_cartesian(ylim = c(-0.3, 1), 
+                  expand = FALSE) +
+  scale_y_continuous(breaks = seq(-0.3, 1, 0.1), 
+                     minor_breaks = NULL, 
+                     labels = round(seq(-0.3, 1, 0.1)*100)) +
+  labs(x = "Production stage",
+       y = paste("% lifespan GHG emissions (%)"))
+x11()
+print(small_multiples)
