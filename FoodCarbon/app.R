@@ -19,6 +19,7 @@
 # 
 # Load required packages
 library(shiny)      # for app
+library(shinyWidgets) # for extra cool widgets:  https://github.com/dreamRs/shinyWidgets
 library(readxl)     # read Excel spreadsheets
 library(dplyr)      # data manipulation
 library(tidyr)      # tidying data
@@ -62,26 +63,28 @@ df$ghg_total <- df %>%
 # 
 # Define UI
 ui <- fluidPage(
-
+    
     # Application title
     titlePanel("Food carbon emissions"),
+    
+    fluidRow(
 
-    # Sidebar with checkboxes to select which types of food to show
-    # https://stackoverflow.com/a/26884455
-    sidebarLayout(
-        position = "right",
-        sidebarPanel(h3("Type of product"),
-            actionButton("selectAll", label = "Select all"),
-            actionButton("selectNone", label = "Select none"),
-            checkboxGroupInput("selectedType", 
-                               label = "",
-                               choices = unique(df$type),
-                               selected = "all")
+        # Sidebar with checkboxes to select which types of food to show
+        # https://stackoverflow.com/a/26884455
+        column(3,
+               h3("Type of product"),
+               actionButton("selectAll", label = "Select all"),
+               actionButton("selectNone", label = "Select none"),
+               checkboxGroupButtons("selectedType", 
+                                    label = "",
+                                    choices = unique(df$type),
+                                    selected = unique(df$type),
+                                    direction = "vertical")
         ),
+        column(9,
 
-        # Show a plot of the generated distribution
-        mainPanel(
-           plotOutput("mainPlot")
+        # Plot of GHG vs. mass of food
+        plotOutput("mainPlot")
         )
     )
 )
@@ -107,13 +110,13 @@ server <- function(input, output, session) {
     # https://shiny.rstudio.com/articles/action-buttons.html
     # https://stackoverflow.com/a/26884455
     observeEvent(input$selectAll, {
-            updateCheckboxGroupInput(session = session,
+            updateCheckboxGroupButtons(session = session,
                                      inputId = "selectedType",
                                      selected = c(unique(df$type))
             )
         })
     observeEvent(input$selectNone, {
-            updateCheckboxGroupInput(session = session,
+            updateCheckboxGroupButtons(session = session,
                                      inputId = "selectedType",
                                      selected = ""
             )
