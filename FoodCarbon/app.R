@@ -119,24 +119,45 @@ server <- function(input, output, session) {
             )
         })
 
+    # Make a background dataframe to plot non-selected data in grey
+    # https://drsimonj.svbtle.com/plotting-background-data-for-groups-with-ggplot2
+    background_df <- df %>% 
+        select(-type)
+    
+    # Make a dataframe with only data for the selected food types
+    # http://www.datasciencemadesimple.com/filter-subsetting-rows-r-using-dplyr/
+    selected_df <- reactive({
+        df %>% 
+            filter(type %in% input$selectedType)
+    })
+    
+    # Make a dataframe with only data for the unselected food types
+    # https://stackoverflow.com/questions/34444295/how-to-specify-does-not-contain-in-dplyr-filter
+    unselected_df <- reactive({
+        df %>% 
+            filter(!(type %in% input$selectedType))
+    })
+    
     output$mainPlot <- renderPlot({
-        ggplot(data = df) +
+        ggplot(data = selected_df()) +
             aes(x = mass, y = mass*ghg_total, colour = type) +
-            scale_x_log10() +
-            scale_y_log10() +
-            scale_color_manual(values = colours_type) +
+            geom_point(data = unselected_df(), size=3, colour="grey") +
             geom_point(size=3, alpha=0.7) +
             geom_point(size=3, shape=1) +
+            scale_color_manual(values = colours_type) +
+            scale_x_log10() +
+            scale_y_log10() +
             #geom_text(aes(label=Product),hjust=0, vjust=0) +  # label points:  https://stackoverflow.com/a/15625149
             geom_text_repel(aes(label = Product),
                             box.padding   = 0.35, 
                             point.padding = 0.5,
                             show.legend = FALSE) +  # label points with auto-repelling text:  https://stackoverflow.com/a/48762376
+            guides(fill = FALSE, color = FALSE) +
             theme_light() +
             labs(x = paste("Total food mass produced (", GetUnits("mass", df_meta), ")"),
                  y = paste("Total GHG mass produced (", GetUnits("ghg", df_meta), ")"), 
                  colour = "Type",
-                 title =  input$selectAll)#"Totals produced per year")
+                 title =  "Totals produced per year")
     })
 }
 
