@@ -86,7 +86,7 @@ ui <- fluidPage(
 # <!-- ===================================================================== -->
 # 
 # Define server logic
-server <- function(input, output) {
+server <- function(input, output, session) {
     
     # Point R to custom functions
     # https://stackoverflow.com/questions/38081580/calling-other-function-in-shiny-server
@@ -101,9 +101,20 @@ server <- function(input, output) {
     }
     
     # Update selection list if "all" or "none" is selected
-    # if (selectedType=="all"){
-    #     
-    # }
+    # https://stackoverflow.com/a/26884455
+    observe(({
+        if ("all" %in% input$selectedType) {
+            updateCheckboxGroupInput(session = session,
+                                     inputId = "selectedType",
+                                     selected = c(unique(df$type))
+            )
+        } else if ("none" %in% input$selectedType) {
+            updateCheckboxGroupInput(session = session,
+                                     inputId = "selectedType",
+                                     selected = ""
+            )
+        }
+    }))
 
     output$mainPlot <- renderPlot({
         ggplot(data = df) +
@@ -122,7 +133,7 @@ server <- function(input, output) {
             labs(x = paste("Total food mass produced (", GetUnits("mass", df_meta), ")"),
                  y = paste("Total GHG mass produced (", GetUnits("ghg", df_meta), ")"), 
                  colour = "Type",
-                 title = input$selectedType)#"Totals produced per year")
+                 title =  input$selectedType)#"Totals produced per year")
     })
 }
 
