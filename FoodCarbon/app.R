@@ -81,10 +81,18 @@ ui <- fluidPage(
                                     selected = unique(df$type),
                                     direction = "vertical")
         ),
-        column(9,
 
         # Plot of GHG vs. mass of food
-        plotOutput("mainPlot")
+        column(9,
+               plotOutput("totalsPlot")
+        )
+    ),
+    
+    fluidRow(
+        
+        # Plot of GHGs at each stage of production
+        column(12,
+               plotOutput("stagesPlot")
         )
     )
 )
@@ -141,9 +149,57 @@ server <- function(input, output, session) {
             filter(!(type %in% input$selectedType))
     })
     
-    output$mainPlot <- renderPlot({
+    # Select variables and convert to long form
+    df_ghg <- reactive({
+        selected_df() %>%
+        select(starts_with("ghg") | "Product" | "type")
+    })
+    df_ghg_long <- reactive({
+        df_ghg() %>%
+        select(-ends_with("total")) %>%
+        pivot_longer(cols = starts_with("ghg"),
+                     names_to = "stage",
+                     values_to = "stage_ghg_emissions") %>%
+        mutate(stage = factor(stage, levels=unique(stage)))
+    })
+    df_ghg_unselected <- reactive({
+        unselected_df() %>%
+            select(starts_with("ghg") | "Product" | "type") %>% 
+        select(-ends_with("total")) %>%
+        pivot_longer(cols = starts_with("ghg"),
+                     names_to = "stage",
+                     values_to = "stage_ghg_emissions") %>%
+        mutate(stage = factor(stage, levels=unique(stage)))
+    })
+    
+    # Select variables, compute % of GHG produced at each stage, and convert to long form
+    df_ghg_percents <-  reactive({
+        df_ghg() %>% 
+        mutate_at(vars(contains("ghg") & !contains("total")), funs(./ ghg_total))
+    })
+    df_ghg_percents_long <-  reactive({
+        df_ghg_percents() %>% 
+        pivot_longer(cols = (starts_with("ghg") & !ends_with("total")), 
+                     names_to = "stage", 
+                     values_to = "stage_ghg_emissions") %>% 
+        mutate(stage = factor(stage, levels=unique(stage)))  # convert stages to factors so they will be plotted in the correct order; https://www.r-graph-gallery.com/267-reorder-a-variable-in-ggplot2
+    })
+    df_ghg_unselected_percents <- reactive({
+        unselected_df() %>%
+        select(starts_with("ghg") | "Product" | "type") %>% 
+        mutate_at(vars(contains("ghg") & !contains("total")), funs(./ ghg_total)) %>% 
+        pivot_longer(cols = (starts_with("ghg") & !ends_with("total")), 
+                     names_to = "stage", 
+                     values_to = "stage_ghg_emissions") %>% 
+        mutate(stage = factor(stage, levels=unique(stage)))
+    })
+    
+    # Plot GHG vs. amount of food produced
+    output$totalsPlot <- renderPlot({
         ggplot(data = selected_df()) +
-            aes(x = mass, y = mass*ghg_total, colour = type) +
+            aes(x = mass, 
+                y = mass*ghg_total, 
+                colour = type) +
             geom_point(data = unselected_df(), size=3, colour="grey") +
             geom_point(size=3, alpha=0.7) +
             geom_point(size=3, shape=1) +
@@ -161,6 +217,35 @@ server <- function(input, output, session) {
                  y = paste("Total GHG mass produced (", GetUnits("ghg", df_meta), ")"), 
                  colour = "Type",
                  title =  "Totals produced per year")
+    })
+    
+    # Plot GHG at each stage
+    output$stagesPlot <- renderPlot({
+        ggplot(data = df_ghg_percents_long()) +
+            aes(x = stage, 
+                y = stage_ghg_emissions, 
+                group = Product, 
+                color = type) +   # group = Product is important!
+            geom_path(data = df_ghg_unselected_percents(), color = "grey") +
+            geom_path(size = 1) +
+            theme_light() +
+            scale_color_manual(values = colours_type) +
+            coord_cartesian(ylim = c(-0.3, 1), 
+                            expand = FALSE) +
+            scale_y_continuous(breaks = seq(-0.3, 1, 0.1), 
+                               minor_breaks = NULL, 
+                               labels = round(seq(-0.3, 1, 0.1)*100)) +
+            labs(x = "Production stage",
+                 y = paste("% lifespan GHG emissions (%)"))
+        
+        # ggplot(data = df_ghg_percents_long()) +
+        #     aes(x = stage, y = stage_ghg_emissions, group = Product, color = type) +   # group = Product is important!
+        #     geom_path() +
+        #     theme_light() +
+        #     scale_color_manual(values = colours_type) +
+        #     labs(x = "Production stage",
+        #          y = paste("GHG emissions per kg food (", GetUnits("ghg", df_meta), ")")) #+
+    #scale_x_discrete(labels=unique("stage"))
     })
 }
 
