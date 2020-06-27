@@ -66,13 +66,16 @@ ui <- fluidPage(
     # Application title
     titlePanel("Food carbon emissions"),
 
-    # Sidebar with a slider input for number of bins 
+    # Sidebar with checkboxes to select which types of food to show
+    # https://stackoverflow.com/a/26884455
     sidebarLayout(
         position = "right",
         sidebarPanel(
+            actionButton("selectAll", label="Select all"),
+            actionButton("selectNone", label="Select none"),
             checkboxGroupInput("selectedType", 
                                h3("Type of product"), 
-                               choices = c("all", "none", unique(df$type)),
+                               choices = unique(df$type),
                                selected = "all")
         ),
 
@@ -101,20 +104,20 @@ server <- function(input, output, session) {
     }
     
     # Update selection list if "all" or "none" is selected
+    # https://shiny.rstudio.com/articles/action-buttons.html
     # https://stackoverflow.com/a/26884455
-    observe(({
-        if ("all" %in% input$selectedType) {
+    observeEvent(input$selectAll, {
             updateCheckboxGroupInput(session = session,
                                      inputId = "selectedType",
                                      selected = c(unique(df$type))
             )
-        } else if ("none" %in% input$selectedType) {
+        })
+    observeEvent(input$selectNone, {
             updateCheckboxGroupInput(session = session,
                                      inputId = "selectedType",
                                      selected = ""
             )
-        }
-    }))
+        })
 
     output$mainPlot <- renderPlot({
         ggplot(data = df) +
@@ -133,7 +136,7 @@ server <- function(input, output, session) {
             labs(x = paste("Total food mass produced (", GetUnits("mass", df_meta), ")"),
                  y = paste("Total GHG mass produced (", GetUnits("ghg", df_meta), ")"), 
                  colour = "Type",
-                 title =  input$selectedType)#"Totals produced per year")
+                 title =  input$selectAll)#"Totals produced per year")
     })
 }
 
