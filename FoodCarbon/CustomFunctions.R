@@ -1,7 +1,7 @@
 # Function to get units for a given variable name
-GetUnits <- function(string_in) {
+GetUnits <- function(string_in, df_lookup) {
   varName <- strsplit(string_in, "_")[[1]][1]
-  string_out <- df_meta %>% 
+  string_out <- df_lookup %>% 
     filter(VariableName==varName) %>% 
     select(Units) %>% 
     toString()
@@ -9,8 +9,8 @@ GetUnits <- function(string_in) {
 }
 
 # Function to get colour for a given variable name
-GetColour <- function(string_in) {
-  string_out <- df_colours %>% 
+GetColour <- function(string_in, df_lookup) {
+  string_out <- df_lookup %>% 
     filter(Type==string_in) %>% 
     select(Colour) %>% 
     toString()

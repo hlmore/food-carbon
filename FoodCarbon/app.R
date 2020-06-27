@@ -49,9 +49,9 @@ df_meta <- read_excel(file.path(filePath, fileName,
 df_colours <- read_excel(file.path(filePath, fileName, 
                                    fsep = .Platform$file.sep), sheet = colourSheetName)
 # Check variables
-str(df)
-str(df_meta)
-str(df_colours)
+# str(df)
+# str(df_meta)
+# str(df_colours)
 
 # Make new variable containing sum of all greenhouse gas emissions
 df$ghg_total <- df %>%  
@@ -72,8 +72,8 @@ ui <- fluidPage(
         sidebarPanel(
             checkboxGroupInput("selectedType", 
                                h3("Type of product"), 
-                               choices = unique(df$type),
-                               selected = 1)
+                               choices = c("all", "none", unique(df$type)),
+                               selected = "all")
         ),
 
         # Show a plot of the generated distribution
@@ -97,8 +97,13 @@ server <- function(input, output) {
     # https://www.datamentor.io/r-programming/list/
     colours_type <- c()
     for (item in unique(df$type)){
-        colours_type[[item]] <- GetColour(item)
+        colours_type[[item]] <- GetColour(item, df_colours)
     }
+    
+    # Update selection list if "all" or "none" is selected
+    # if (selectedType=="all"){
+    #     
+    # }
 
     output$mainPlot <- renderPlot({
         ggplot(data = df) +
@@ -114,10 +119,10 @@ server <- function(input, output) {
                             point.padding = 0.5,
                             show.legend = FALSE) +  # label points with auto-repelling text:  https://stackoverflow.com/a/48762376
             theme_light() +
-            labs(x = paste("Total food mass produced (", GetUnits("mass"), ")"),
-                 y = paste("Total GHG mass produced (", GetUnits("ghg"), ")"), 
+            labs(x = paste("Total food mass produced (", GetUnits("mass", df_meta), ")"),
+                 y = paste("Total GHG mass produced (", GetUnits("ghg", df_meta), ")"), 
                  colour = "Type",
-                 title = "Totals produced per year")
+                 title = input$selectedType)#"Totals produced per year")
     })
 }
 
