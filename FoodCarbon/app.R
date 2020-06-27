@@ -70,11 +70,11 @@ ui <- fluidPage(
     # https://stackoverflow.com/a/26884455
     sidebarLayout(
         position = "right",
-        sidebarPanel(
-            actionButton("selectAll", label="Select all"),
-            actionButton("selectNone", label="Select none"),
+        sidebarPanel(h3("Type of product"),
+            actionButton("selectAll", label = "Select all"),
+            actionButton("selectNone", label = "Select none"),
             checkboxGroupInput("selectedType", 
-                               h3("Type of product"), 
+                               label = "",
                                choices = unique(df$type),
                                selected = "all")
         ),
