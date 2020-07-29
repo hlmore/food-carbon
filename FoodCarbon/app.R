@@ -20,6 +20,7 @@
 # Load required packages
 library(shiny)      # for app
 library(shinyWidgets) # for extra cool widgets:  https://github.com/dreamRs/shinyWidgets
+library(shinyjs)    # use Javascript functionality without needing .js :  https://www.rdocumentation.org/packages/shinyjs/versions/1.1
 library(readxl)     # read Excel spreadsheets
 library(dplyr)      # data manipulation
 library(tidyr)      # tidying data
@@ -64,6 +65,10 @@ df$ghg_total <- df %>%
 # Define UI
 ui <- fluidPage(
     
+    # Let Shiny know you want to use JavaScript functionality
+    # https://www.rdocumentation.org/packages/shinyjs/versions/1.1
+    useShinyjs(),
+    
     # Application title
     titlePanel("Food carbon emissions"),
     
@@ -75,11 +80,17 @@ ui <- fluidPage(
                h3("Type of product"),
                actionButton("selectAll", label = "Select all"),
                actionButton("selectNone", label = "Select none"),
+               materialSwitch(
+                   inputId = "selectOne",
+                   label = "Limit selection to one type", 
+                   right = TRUE
+               ),
                checkboxGroupButtons("selectedType", 
                                     label = "",
                                     choices = unique(df$type),
                                     selected = unique(df$type),
-                                    direction = "vertical")
+                                    direction = "vertical"
+                                 )
         ),
 
         # Plot of GHG vs. mass of food
@@ -114,22 +125,79 @@ server <- function(input, output, session) {
         colours_type[[item]] <- GetColour(item, df_colours)
     }
     
-    # Update selection list if "all" or "none" is selected
+    # Initialize variable to store the most recently clicked type(s)
+    # Use <<- to save a variable between invocations:
+    # https://stackoverflow.com/q/36240172
+    mostRecentlySelectedType <<- ""
+    
+    # If "all" or "none" is selected, update selection list and turn off locking to a single selection
     # https://shiny.rstudio.com/articles/action-buttons.html
     # https://stackoverflow.com/a/26884455
+    # See info on reactive events and observing:
+    # https://stackoverflow.com/a/53016939
     observeEvent(input$selectAll, {
+            mostRecentlySelectedType <<- c(unique(df$type))
             updateCheckboxGroupButtons(session = session,
                                      inputId = "selectedType",
-                                     selected = c(unique(df$type))
+                                     selected = mostRecentlySelectedType
+            )
+            updateMaterialSwitch(session = session,
+                                 inputId = "selectOne",
+                                 value = FALSE
             )
         })
     observeEvent(input$selectNone, {
+            mostRecentlySelectedType <<- ""
             updateCheckboxGroupButtons(session = session,
                                      inputId = "selectedType",
-                                     selected = ""
+                                     selected = mostRecentlySelectedType
+            )
+            updateMaterialSwitch(session = session,
+                                 inputId = "selectOne",
+                                 value = FALSE
             )
         })
-
+    
+    # If you are turning ON the option to select only one food type, set a single selected type and reset the list of previously selected types so you don't screw up the comparisons later.
+    # If you are turning OFF this option, do nothing.
+    observeEvent(input$selectOne, {
+        if (input$selectOne) {
+            mostRecentlySelectedType <<- ""
+            # If multiple types are currently selected, take the first one
+            if (length(input$selectedType) > 1) {
+                mostRecentlySelectedType <<- input$selectedType[1]
+            # If no types are currently selected, choose the first option
+            } else if (length(input$selectedType) == 0) {
+                mostRecentlySelectedType <<- unique(df$type)[1]
+            # If one type is currently selected, don't change anything
+            } else {
+                mostRecentlySelectedType <<- input$selectedType
+            }
+            updateCheckboxGroupButtons(session = session,
+                                       inputId = "selectedType",
+                                       selected = mostRecentlySelectedType
+            )
+        }
+    })
+    
+    # Keep track of which food type is being selected.
+    # If locked to a single selection, only allow the last clicked food type to be selected
+    # Use Javascript functionality to run this on clicking the button group, rather than using observeEvent, because using ObserveEvent on selectedType to update selectedType results in an infinite loop.
+    # https://www.rdocumentation.org/packages/shinyjs/versions/1.1/topics/onevent
+    onclick("selectedType", {
+        # Store the type that was just clicked.  At this point, mostRecentlySelectedType has not been updated, so it stores the list of all types selected after the LAST (not current) click
+        # There isn't a command to find elements that aren't duplicated between lists, so make one up by using the asymmetric setdiff() command twice.
+        # https://stat.ethz.ch/R-manual/R-devel/library/base/html/sets.html
+        # https://www.rdocumentation.org/packages/prob/versions/1.0-1/topics/setdiff
+        mostRecentlySelectedType <<- c(setdiff(input$selectedType, mostRecentlySelectedType), setdiff(mostRecentlySelectedType, input$selectedType))
+        if (input$selectOne) {
+            # Update buttons to only show the most recently clicked type
+            updateCheckboxGroupButtons(session = session,
+                                       inputId = "selectedType",
+                                       selected = mostRecentlySelectedType
+        )}
+    })
+   
     # Make a background dataframe to plot non-selected data in grey
     # https://drsimonj.svbtle.com/plotting-background-data-for-groups-with-ggplot2
     background_df <- df %>% 
@@ -216,7 +284,7 @@ server <- function(input, output, session) {
             labs(x = paste("Total food mass produced (", GetUnits("mass", df_meta), ")"),
                  y = paste("Total GHG mass produced (", GetUnits("ghg", df_meta), ")"), 
                  colour = "Type",
-                 title =  "Totals produced per year")
+                 title = "Totals produced per year")
     })
     
     # Plot GHG at each stage
@@ -228,6 +296,7 @@ server <- function(input, output, session) {
                 color = type) +   # group = Product is important!
             geom_path(data = df_ghg_unselected_percents(), color = "grey") +
             geom_path(size = 1) +
+            guides(color = FALSE) +
             theme_light() +
             scale_color_manual(values = colours_type) +
             coord_cartesian(ylim = c(-0.3, 1), 
