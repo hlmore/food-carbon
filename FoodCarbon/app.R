@@ -55,10 +55,13 @@ df_colours <- read_excel(file.path(filePath, fileName,
 # str(df_meta)
 # str(df_colours)
 
-# Make new variable containing sum of all greenhouse gas emissions
+# Make new variable containing sum of greenhouse gas emissions at all stages
 df$ghg_total <- df %>%  
     select(starts_with("ghg")) %>% 
     rowSums(., na.rm = TRUE)
+
+# Make new variable containing total mass of greenhouse gas emissions per year
+df$mass_ghg <- df$mass*df$ghg_total
 
 # <!-- ===================================================================== -->
 # 
@@ -72,38 +75,54 @@ ui <- fluidPage(
     # Application title
     titlePanel("Food carbon emissions"),
     
-    fluidRow(
-
-        # Sidebar with checkboxes to select which types of food to show
-        # https://stackoverflow.com/a/26884455
-        column(3,
-               h3("Type of product"),
-               actionButton("selectAll", label = "Select all"),
-               actionButton("selectNone", label = "Select none"),
-               materialSwitch(
-                   inputId = "selectOne",
-                   label = "Limit selection to one type", 
-                   right = TRUE
-               ),
-               checkboxGroupButtons("selectedType", 
-                                    label = "",
-                                    choices = unique(df$type),
-                                    selected = unique(df$type),
-                                    direction = "vertical"
-                                 )
-        ),
-
-        # Plot of GHG vs. mass of food
-        column(9,
-               plotOutput("totalsPlot")
-        )
-    ),
-    
-    fluidRow(
+    # Add div for relative coordinates for tooltips
+    # https://gitlab.com/snippets/16220
+    # Also see here for good tooltip info:
+    # https://stackoverflow.com/questions/38917101/how-do-i-show-the-y-value-on-tooltip-while-hover-in-ggplot2
+    div(
         
-        # Plot of GHGs at each stage of production
-        column(12,
-               plotOutput("stagesPlot")
+        fluidRow(
+    
+            # Sidebar with checkboxes to select which types of food to show
+            # https://stackoverflow.com/a/26884455
+            column(3,
+                   h3("Type of product"),
+                   actionButton("selectAll", label = "Select all"),
+                   actionButton("selectNone", label = "Select none"),
+                   materialSwitch(
+                       inputId = "selectOne",
+                       label = "Limit selection to one type", 
+                       right = TRUE
+                   ),
+                   checkboxGroupButtons("selectedType", 
+                                        label = "",
+                                        choices = unique(df$type),
+                                        selected = unique(df$type),
+                                        direction = "vertical"
+                                     )
+            ),
+    
+            # Plot of GHG vs. mass of food
+            # Include options to allow interaction with plot
+            # https://shiny.rstudio.com/articles/plot-interaction.html
+            column(9,
+                   style = "position:relative",
+                   plotOutput("totalsPlot",
+                          click = "totalsPlot_click",
+                          hover = "totalsPlot_hover",
+                          brush = "totalsPlot_brush"),
+                   uiOutput("totalsPlot_hover_info")
+            )
+        ),
+        
+        fluidRow(
+            
+            # Plot of GHGs at each stage of production
+            column(12,
+                   plotOutput("stagesPlot",
+                              click = "stagesPlot_click",
+                              hover = "stagesPlot_hover")
+            )
         )
     )
 )
@@ -266,7 +285,7 @@ server <- function(input, output, session) {
     output$totalsPlot <- renderPlot({
         ggplot(data = selected_df()) +
             aes(x = mass, 
-                y = mass*ghg_total, 
+                y = mass_ghg, 
                 colour = type) +
             geom_point(data = unselected_df(), size=3, colour="grey") +
             geom_point(size=3, alpha=0.7) +
@@ -285,6 +304,44 @@ server <- function(input, output, session) {
                  y = paste("Total GHG mass produced (", GetUnits("ghg", df_meta), ")"), 
                  colour = "Type",
                  title = "Totals produced per year")
+    })
+    
+    # Add text to plot when you hover over a point
+    # https://gitlab.com/snippets/16220
+    output$totalsPlot_hover_info <- renderUI({
+        hover <- input$totalsPlot_hover
+        point <- nearPoints(selected_df(), hover, threshold = 10, maxpoints = 1, addDist = TRUE)
+        if (nrow(point) == 0) return(NULL)
+
+        # Adjust for log scale of axis
+        hover$x <- log10(hover$x)
+        hover$y <- log10(hover$y)
+        
+        # Calculate point position INSIDE the image as percent of total dimensions
+        # from left (horizontal) and from top (vertical)
+        left_pct <- (hover$x - hover$domain$left) / (hover$domain$right - hover$domain$left)
+        top_pct <- (hover$domain$top - hover$y) / (hover$domain$top - hover$domain$bottom)
+        # Calculate distance from left and bottom side of the picture in pixels
+        left_px <- hover$range$left + left_pct * (hover$range$right - hover$range$left)
+        top_px <- hover$range$top + top_pct * (hover$range$bottom - hover$range$top)
+
+        # Create style property for tooltip
+        # Set background color it's a bit transparent
+        # Set z-index so we are sure are tooltip will be on top
+        style <- paste0("position:absolute; 
+                        z-index:100; 
+                        background-color: rgba(245, 245, 245, 0.85); ",
+                        "left:", left_px + 2, "px; 
+                        top:", top_px + 2, "px;")
+
+        # Create tooltip as wellPanel
+        wellPanel(
+            style = style,
+            p(HTML(
+                paste0("<h4>", point$Product, "</h4>",
+                       "<b> Total mass produced: </b>", round(point$mass), " * ", GetUnits("mass", df_meta), "<br/>",
+                       "<b> Total GHG produced: </b>", round(point$mass_ghg), " ", GetUnits("ghg", df_meta), "<br/>")))
+        )
     })
     
     # Plot GHG at each stage
