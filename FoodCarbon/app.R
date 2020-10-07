@@ -38,18 +38,27 @@ colourSheetName <- "Type_meta"  # colours
 
 # <!-- ===================================================================== -->
 # 
+# Labels and other info to be used later
+units_label <- paste("kg CO2eq")
+percentLifespan_label <- paste("% lifespan GHG emissions (%)")
+
+# <!-- ===================================================================== -->
+# 
 # Load data
 #
 # See info on scoping:
 # http://rstudio.github.io/shiny/tutorial/#scoping
 
 # Load data
-df <- read_excel(file.path(filePath, fileName, 
-                           fsep = .Platform$file.sep), sheet = dataSheetName)
-df_meta <- read_excel(file.path(filePath, fileName, 
-                                fsep = .Platform$file.sep), sheet = metaSheetName)
-df_colours <- read_excel(file.path(filePath, fileName, 
-                                   fsep = .Platform$file.sep), sheet = colourSheetName)
+df         <- read_excel(file.path(filePath, fileName,
+                                   fsep = .Platform$file.sep),
+                         sheet = dataSheetName)
+df_meta    <- read_excel(file.path(filePath, fileName,
+                                   fsep = .Platform$file.sep),
+                         sheet = metaSheetName)
+df_colours <- read_excel(file.path(filePath, fileName,
+                                   fsep = .Platform$file.sep),
+                         sheet = colourSheetName)
 # Check variables
 # str(df)
 # str(df_meta)
@@ -117,8 +126,19 @@ ui <- fluidPage(
         
         fluidRow(
             
+            # Controls for stages plot
+            column(3,
+                   h3("Express emissions as"),
+                   radioGroupButtons("ghgStages_scale", 
+                                        label = "",
+                                        choices = c(units_label, 
+                                                    percentLifespan_label),
+                                        direction = "vertical"
+                   )
+            ),
+            
             # Plot of GHGs at each stage of production
-            column(12,
+            column(9,
                    plotOutput("stagesPlot",
                               click = "stagesPlot_click",
                               hover = "stagesPlot_hover")
@@ -208,7 +228,10 @@ server <- function(input, output, session) {
         # There isn't a command to find elements that aren't duplicated between lists, so make one up by using the asymmetric setdiff() command twice.
         # https://stat.ethz.ch/R-manual/R-devel/library/base/html/sets.html
         # https://www.rdocumentation.org/packages/prob/versions/1.0-1/topics/setdiff
-        mostRecentlySelectedType <<- c(setdiff(input$selectedType, mostRecentlySelectedType), setdiff(mostRecentlySelectedType, input$selectedType))
+        mostRecentlySelectedType <<- c(setdiff(input$selectedType, 
+                                               mostRecentlySelectedType), 
+                                       setdiff(mostRecentlySelectedType, 
+                                               input$selectedType))
         if (input$selectOne) {
             # Update buttons to only show the most recently clicked type
             updateCheckboxGroupButtons(session = session,
@@ -259,13 +282,29 @@ server <- function(input, output, session) {
         mutate(stage = factor(stage, levels=unique(stage)))
     })
     
-    # Select variables, compute % of GHG produced at each stage, and convert to long form
-    df_ghg_percents <-  reactive({
-        df_ghg() %>% 
-        mutate_at(vars(contains("ghg") & !contains("total")), funs(./ ghg_total))
+    # Select variables, compute % of GHG produced at each stage if needed, and convert to long form
+    convertToPercents <- function(inputdf) {
+        df_ghg_percents <-  inputdf() %>% 
+            mutate_at(vars(contains("ghg") & !contains("total")), 
+                      funs(./ ghg_total))
+        return(df_ghg_percents)
+    }
+    convertToPercents_helper <- function(indputdf, switchString) {
+        if (switchString == GetUnits("ghg", df_meta)) {
+            outputdf <- convertToPercents(indputdf)
+        } else if (switchString == percentLifespan_label) {
+            outputdf() <- indputdf
+        } else {
+            # because we used a radio button, we should never get here
+        }
+        return(outputdf)
+    }
+    df_ghg_lifespan <- reactive({
+        convertToPercents_helper(df_ghg, input$ghgStages_scale)
     })
-    df_ghg_percents_long <-  reactive({
-        df_ghg_percents() %>% 
+    
+    df_ghg_lifespan_long <-  reactive({
+        df_ghg_lifespan() %>% 
         pivot_longer(cols = (starts_with("ghg") & !ends_with("total")), 
                      names_to = "stage", 
                      values_to = "stage_ghg_emissions") %>% 
@@ -274,7 +313,8 @@ server <- function(input, output, session) {
     df_ghg_unselected_percents <- reactive({
         unselected_df() %>%
         select(starts_with("ghg") | "Product" | "type") %>% 
-        mutate_at(vars(contains("ghg") & !contains("total")), funs(./ ghg_total)) %>% 
+        mutate_at(vars(contains("ghg") & !contains("total")), 
+                  funs(./ ghg_total)) %>% 
         pivot_longer(cols = (starts_with("ghg") & !ends_with("total")), 
                      names_to = "stage", 
                      values_to = "stage_ghg_emissions") %>% 
@@ -287,9 +327,13 @@ server <- function(input, output, session) {
             aes(x = mass, 
                 y = mass_ghg, 
                 colour = type) +
-            geom_point(data = unselected_df(), size=3, colour="grey") +
-            geom_point(size=3, alpha=0.7) +
-            geom_point(size=3, shape=1) +
+            geom_point(data = unselected_df(), 
+                       size=3, 
+                       colour="grey") +
+            geom_point(size=3, 
+                       alpha=0.7) +
+            geom_point(size=3, 
+                       shape=1) +
             scale_color_manual(values = colours_type) +
             scale_x_log10() +
             scale_y_log10() +
@@ -298,10 +342,13 @@ server <- function(input, output, session) {
                             box.padding   = 0.35, 
                             point.padding = 0.5,
                             show.legend = FALSE) +  # label points with auto-repelling text:  https://stackoverflow.com/a/48762376
-            guides(fill = FALSE, color = FALSE) +
+            guides(fill = FALSE, 
+                   color = FALSE) +
             theme_light() +
-            labs(x = paste("Total food mass produced (", GetUnits("mass", df_meta), ")"),
-                 y = paste("Total GHG mass produced (", GetUnits("ghg", df_meta), ")"), 
+            labs(x = paste("Total food mass produced (", 
+                           GetUnits("mass", df_meta), ")"),
+                 y = paste("Total GHG mass produced (", 
+                           GetUnits("ghg", df_meta), ")"), 
                  colour = "Type",
                  title = "Totals produced per year")
     })
@@ -310,7 +357,11 @@ server <- function(input, output, session) {
     # https://gitlab.com/snippets/16220
     output$totalsPlot_hover_info <- renderUI({
         hover <- input$totalsPlot_hover
-        point <- nearPoints(selected_df(), hover, threshold = 10, maxpoints = 1, addDist = TRUE)
+        point <- nearPoints(selected_df(), 
+                            hover, 
+                            threshold = 10, 
+                            maxpoints = 1, 
+                            addDist = TRUE)
         if (nrow(point) == 0) return(NULL)
 
         # Adjust for log scale of axis
@@ -326,7 +377,7 @@ server <- function(input, output, session) {
         top_px <- hover$range$top + top_pct * (hover$range$bottom - hover$range$top)
 
         # Create style property for tooltip
-        # Set background color it's a bit transparent
+        # Set background color so it's a bit transparent
         # Set z-index so we are sure are tooltip will be on top
         style <- paste0("position:absolute; 
                         z-index:100; 
@@ -339,19 +390,22 @@ server <- function(input, output, session) {
             style = style,
             p(HTML(
                 paste0("<h4>", point$Product, "</h4>",
-                       "<b> Total mass produced: </b>", round(point$mass), " * ", GetUnits("mass", df_meta), "<br/>",
-                       "<b> Total GHG produced: </b>", round(point$mass_ghg), " ", GetUnits("ghg", df_meta), "<br/>")))
+                       "<b> Total mass produced: </b>", 
+                       round(point$mass), " * ", GetUnits("mass", df_meta), "<br/>",
+                       "<b> Total GHG produced: </b>", 
+                       round(point$mass_ghg), " ", GetUnits("ghg", df_meta), "<br/>")))
         )
     })
     
     # Plot GHG at each stage
     output$stagesPlot <- renderPlot({
-        ggplot(data = df_ghg_percents_long()) +
+        ggplot(data = df_ghg_lifespan()) +
             aes(x = stage, 
                 y = stage_ghg_emissions, 
                 group = Product, 
                 color = type) +   # group = Product is important!
-            geom_path(data = df_ghg_unselected_percents(), color = "grey") +
+            geom_path(data = df_ghg_unselected_percents(), 
+                      color = "grey") +
             geom_path(size = 1) +
             guides(color = FALSE) +
             theme_light() +
@@ -364,7 +418,7 @@ server <- function(input, output, session) {
             labs(x = "Production stage",
                  y = paste("% lifespan GHG emissions (%)"))
         
-        # ggplot(data = df_ghg_percents_long()) +
+        # ggplot(data = df_ghg_lifespan()) +
         #     aes(x = stage, y = stage_ghg_emissions, group = Product, color = type) +   # group = Product is important!
         #     geom_path() +
         #     theme_light() +
