@@ -1,5 +1,5 @@
 # Greenhouse gas emissions of food over the supply chain
-Visualizing the environmental impact of food products at each stage of production.
+Visualize the environmental impact of food products at each stage of production.
 
 ## Table of contents
 * [Description](#description)
