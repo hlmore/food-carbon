@@ -5,12 +5,11 @@ Visualizing the environmental impact of food products at each stage of productio
 * [Description](#description)
 * [Usage](#usage)
 * [To do](#to-do)
-* [Status](#status)
 * [References](#references)
 * [Author](#author)
 
 ## Description
-This is a personal project under active development.
+Personal project under active development.
 
 This interactive app investigates the environmental impacts of food products and supply chain processes, by exploring the greenhouse gas emissions of different types of food at different stages of production.
 
@@ -32,11 +31,8 @@ Run `app.R` to build the app and show interactive plots.
 * Colour buttons for food types to match plot colours
 * Improve aesthetics of layout
 
-## Status
-Under development
-
 ## References
-Data is from table S2 in:
+Data is from table S2 in:<br/>
 [Reducing food's environmental impacts through producers and consumers.](https://science.sciencemag.org/content/360/6392/987.full) J. Poore, T. Nemecek. Science 2018-06-01: 987-992.
 
 ## Author
