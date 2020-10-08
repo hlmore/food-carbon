@@ -30,6 +30,7 @@ Run `app.R` to build the app and show interactive plots.
 * When hovering over a point (on the totals plot) or a line (on the stages plot), highlight the corresponding line or point on the other plot
 * Colour buttons for food types to match plot colours
 * Improve aesthetics of layout
+* Streamline code, especially how the various dataframes are generated/manipulated
 
 ## References
 Data is from table S2 in:<br/>
