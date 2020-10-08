@@ -36,5 +36,7 @@ Run `app.R` to build the app and show interactive plots.
 Data is from table S2 in:<br/>
 [Reducing food's environmental impacts through producers and consumers.](https://science.sciencemag.org/content/360/6392/987.full) J. Poore, T. Nemecek. Science 2018-06-01: 987-992.
 
+This project was inspired by [Makeover Monday's 2020 week 16 challenge](https://data.world/makeovermonday/2020w16) to rework [Our World in Data's visualization](https://ourworldindata.org/food-choice-vs-eating-local).
+
 ## Author
 Created by Heather More
