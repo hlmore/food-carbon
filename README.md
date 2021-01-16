@@ -9,7 +9,7 @@ Visualize the environmental impact of food products at each stage of production.
 * [Author](#author)
 
 ## Description
-Personal project under active development.
+Personal project under development.
 
 This interactive app investigates the environmental impacts of food products and supply chain processes, by exploring the greenhouse gas emissions of different types of food at different stages of production.
 
